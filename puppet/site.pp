@@ -1,0 +1,3 @@
+node localhost {
+    include devbox
+}
