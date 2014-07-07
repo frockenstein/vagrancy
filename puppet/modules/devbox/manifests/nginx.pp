@@ -13,6 +13,14 @@ class devbox::nginx {
         notify => Service['nginx'],
     }
 
+    file { '/etc/nginx/conf.d/vagrancy.conf':
+        ensure  => present,
+        mode    => '0640',
+        source  => 'puppet:///modules/devbox/vagrancy.conf',
+        require => Package['nginx'],
+        notify => Service['nginx'],
+    }
+
     file { '/etc/nginx/nginx.conf':
         ensure  => present,
         mode    => '0640',

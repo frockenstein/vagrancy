@@ -7,7 +7,7 @@ class devbox {
     }
 
     host { 'Update Hosts':
-        name => 'www.vagrancy.dev',
+        name => $domain,
         ip => '127.0.0.1',
     }
 
@@ -23,7 +23,6 @@ class devbox {
     include mysql
     include mysql::server
     include devbox::couchbase
-    include git
     include devbox::wp
 
 }

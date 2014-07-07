@@ -10,7 +10,7 @@ class devbox::wp::params {
     $network_name = 'Vagrancy'
     $network_admin = 'admin'
     $admin_email = 'root@localhost.localdomain'
-    $admin_password = 'passwor'
+    $admin_password = 'hobo'
 
     # test site info
     $site_slug = 'testsite'
@@ -23,7 +23,7 @@ class devbox::wp inherits devbox::wp::params {
     class { 'devbox::wp::base': } ->
     class { 'devbox::wp::mu': } ->
     class { 'devbox::wp::sunrise': } ->
-    #class { 'devbox::wp::plugin': } ->
+    class { 'devbox::wp::plugin': } ->
     anchor { 'devbox::wp::end': }
 }
 
@@ -61,7 +61,6 @@ class devbox::wp::base inherits devbox::wp::params {
         creates => '/usr/bin/wp',
         require => [
             Package['nginx'],
-            Package['git'],
             Class['mysql::server'],
         ],
     }
@@ -69,7 +68,7 @@ class devbox::wp::base inherits devbox::wp::params {
     exec { 'Core Download':
         cwd => $install_dir,
         user => $user,
-        command => "wp core download --version=3.8.3",
+        command => "wp core download",
         require => [
             Exec['Install wp-cli'],
             Package['nginx'],
@@ -97,6 +96,10 @@ PHP",
             Class['mysql::server'],
         ],
     }
+}
+
+
+class devbox::wp::mu inherits devbox::wp::params {
 
     exec { 'Install Multisite':
         cwd => $install_dir,
@@ -109,10 +112,6 @@ PHP",
             Exec['Core Config']
         ],
     }
-}
-
-
-class devbox::wp::mu inherits devbox::wp::params {
 
     # ACT ON THE MULTISITE INSTALL NOW...
     exec { 'Install Domain Plugin':
@@ -127,7 +126,7 @@ class devbox::wp::mu inherits devbox::wp::params {
     exec { 'Install Site':
         cwd => $install_dir,
         logoutput => true,
-		user => $user,
+        user => $user,
         creates => "$install_dir/install-site.html",
         command => "wp site create --slug=$site_slug --title=\"$site_title\" > install-site.html",
         require => Exec['Install Domain Plugin'],
@@ -139,7 +138,7 @@ class devbox::wp::sunrise inherits devbox::wp::params {
     # SUNRISE TURNED ON
     file { "$install_dir/wp-content/sunrise.php":
         ensure => link,
-        target => '/vagrant/script/installfiles/sunrise.php',
+        target => '/vagrant/puppet/modules/devbox/files/sunrise.php',
         require => [
             Exec['Install Domain Plugin'],
         ],
@@ -162,78 +161,11 @@ class devbox::wp::plugin inherits devbox::wp::params {
         owner => $user,
     }
 
-    # symlink plugin folder
-    file { "$install_dir/wp-content/mu-plugins/flagship/":
-        ensure => link,
-        target => '/vagrant/',
-        owner => $user,
-        mode => 644,
-        require => [
-            File["$install_dir/wp-content/mu-plugins/"]
-        ]
-    }
-
-    # symlink theme folder
-    file { "$install_dir/wp-content/themes/base-theme/":
-        ensure => link,
-        target => '/vagrant/themes/base-theme/',
-        require => [
-            File["$install_dir/wp-content/mu-plugins/"]
-        ]
-    }
-
-    exec { 'Activate Flagship Theme':
-        cwd => $install_dir,
-        user => $user,
-        logoutput => true,
-        creates => "$install_dir/install-theme.html",
-        command => "wp theme activate base-theme --url=$site_domain > install-theme.html",
-        require => [
-            File["$install_dir/wp-content/themes/base-theme/"],
-        ],
-    }
-
-    # plugin entry file
-    file { "$install_dir/wp-content/mu-plugins/flagship.php":
-        ensure => present,
-        owner => $user,
-        group => $user,
-        source => "/vagrant/flagship-install.php",
-        require => [
-            Exec['Activate Flagship Theme'],
-            File["$install_dir/wp-content/mu-plugins/flagship/"],
-        ],
-    }
-
-    # SETUP FOR FIRST USE
-    file { "$install_dir/wp-content/mu-plugins/flagship/config-local.php":
-        ensure => present,
-        owner => $user,
-        source => "/vagrant/config-example.php",
-        replace => false,
-        require => File["$install_dir/wp-content/mu-plugins/flagship/"],
-    }
-
     exec { 'Flush Rewrite Rules':
         cwd => $install_dir,
         user => $user,
         command => "wp rewrite flush --url=$site_domain --path=$install_dir",
-        subscribe => Exec['Activate Flagship Theme'],
-    }
-
-    exec { 'build stylesheets and js':
-        cwd => '/vagrant/',
-        command => '/vagrant/script/build',
-        require => [
-            Package['npm'],
-            File["$install_dir/wp-content/mu-plugins/flagship/"],
-        ],
-    }
-
-    file { "$install_dir/wp-content/plugins/cres":
-        target => '/vagrant/util/cres/',
-        ensure => link,
-        require => Exec['Activate Flagship Theme'],
+        subscribe => Exec['Update Config File'],
     }
 
     # HANDY HELPER CRAP
@@ -242,13 +174,6 @@ class devbox::wp::plugin inherits devbox::wp::params {
         ensure => link,
         owner => $user,
         target => "$install_dir",
-    }
-
-    file { '/home/vagrant/flagship/':
-        ensure => link,
-        owner => $user,
-        target => "$install_dir/wp-content/mu-plugins/flagship/",
-        require => File["$install_dir/wp-content/mu-plugins/flagship/"],
     }
 
     file { '/var/www/vagrancy/public_html/phpinfo.php':
